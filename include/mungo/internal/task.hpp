@@ -25,15 +25,17 @@ class task {
 
  public:
   template <typename F>
-  explicit task(F&& f)
-      : m_ptr(std::make_unique<impl<std::decay_t<F>>>(std::forward<F>(f))) {}
+  requires (!std::is_same_v<std::remove_cvref_t<F>, task>)
+  explicit task(F&& callback)
+      : m_ptr(std::make_unique<impl<std::decay_t<F>>>(std::forward<F>(callback))) {}
 
   task(const task&) = delete;
+  task& operator=(const task&) = delete;
 
-  task(task&&) = default;
+  task(task&&) noexcept = default;
   task& operator=(task&&) = default;
 
-  void operator()() const { m_ptr->invoke(); }
+  void operator()() { m_ptr->invoke(); }
 };
 }  // namespace mungo
 

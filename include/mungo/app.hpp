@@ -79,8 +79,7 @@ class app {
 
           request request(mg_req.to_async(), it->second);
           response response(mg_res);
-          m_executor->invoke(task([handler =
-                                       std::move(it_handler->second.get()),
+          m_executor->invoke(task([handler = it_handler->second.get(),
                                    request = std::move(request),
                                    response = std::move(response)]() mutable {
             handler->invoke(std::as_const(request), std::as_const(response));
