@@ -4,6 +4,69 @@
 #include <mungo/mungo.hpp>
 #include <thread>
 
+constexpr auto html = R"(<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mungo &middot; HTTP example</title>
+  <style>
+    html, body {{
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }}
+
+    body {{
+      display: flex;
+      flex-flow: column;
+      justify-content: center;
+      align-items: center;
+
+      font-family: monospace, sans-serif;
+      color: #d0d0d0;
+      background-color: #212121;
+    }}
+
+    a {{
+      color: unset;
+      text-decoration: none;
+    }}
+
+    ul {{
+      padding-left: 16px;
+      list-style-type: none;
+    }}
+
+    span.method {{
+      display: inline-block;
+      min-width: 58px;
+      padding: 0 6px;
+
+      font-weight: bold;
+      border-radius: 4px;
+
+      &.get {{ color: #5da4ff; }}
+      &.post {{ color: #ffd75d; }}
+      &.delete {{ color: #ff5d5d; }}
+    }}
+  </style>
+</head>
+
+<body>
+  <h1>Hello {}!</h1>
+
+  <p>You can access the following API endpoints:</p>
+
+  <ul>
+    <li><a href="/api/users"><span class="method get">GET</span> <span>/api/users</span></a></li>
+    <li><a href="/api/users/42"><span class="method get">GET</span> <span>/api/users/:id</span></a></li>
+    <li><span class="method post">POST</span> <span>/api/users</span></li>
+    <li><span class="method delete">DELETE</span> <span>/api/users/:id</span></li>
+  </ul>
+</body>
+</html>)";
+
 std::atomic_bool is_running = true;
 
 void signal_handler(int) { is_running = false; }
@@ -15,11 +78,6 @@ int main(int, char**) {
   server.setup(
       {
           .unsafe_host = "localhost:80",
-          /*
-            .safe_host = "localhost:443",
-            .cert = "cert.pem",
-            .key = "key.pem",
-          */
       },
       [](const std::string_view msg) { std::cout << "[mungo] " << msg; });
 
@@ -30,20 +88,14 @@ int main(int, char**) {
   server
       .get("/",
            [](const mungo::request& req, const mungo::response& res) {
-             const std::string body = std::format(
-                 "Hello {}!\n"
-                 "API endpoints you can try:\n\n"
-                 "- GET /api/users\n"
-                 "- GET /api/users/:id\n"
-                 "- POST /api/users\n"
-                 "- DELETE /api/users/:id",
-                 req.remote_ip());
+             std::string body = std::format(html, req.remote_ip());
 
-             res.ok(body);
+             res.header("Content-Type", "text/html").ok(std::move(body));
            })
       .get("/api/users",
            [](const mungo::request&, const mungo::response& res) {
-             res.ok("[{id: 42, username: \"Mungo\"}]");
+             res.header("Content-Type", "application/json")
+                 .ok(R"([{"id": 42, "username": "Mungo"}])");
            })
       .get("/api/users/:id",
            [](const mungo::request& req, const mungo::response& res) {
@@ -58,7 +110,8 @@ int main(int, char**) {
                return;
              }
 
-             res.ok("{id: 42, username: \"Mungo\"}");
+             res.header("Content-Type", "application/json")
+                 .ok(R"({"id": 42, "username": "Mungo"})");
            })
       .post("/api/users",
             [](const mungo::request&, const mungo::response& res) {
