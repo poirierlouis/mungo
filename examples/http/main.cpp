@@ -1,3 +1,4 @@
+#include <BS_thread_pool.hpp>
 #include <atomic>
 #include <csignal>
 #include <iostream>
@@ -93,8 +94,9 @@ int main(int, char**) {
     return 1;
   }
 
-  server.use_pool([](auto task) {
-    std::thread([task = std::move(task)] { task(); }).detach();
+  BS::thread_pool pool(std::thread::hardware_concurrency());
+  server.use_pool([&pool](auto task) {
+    pool.detach_task(std::move(task));
   });
 
   server
@@ -148,7 +150,7 @@ int main(int, char**) {
   // server.ws("/ws", [](const mungo::websocket& ws) {});
 
   while (is_running) {
-    server.poll(100);
+    server.poll(1);
   }
 
   return 0;
