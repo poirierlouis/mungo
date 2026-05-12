@@ -8,14 +8,14 @@
 
 namespace mungo {
 class request {
-  std::shared_ptr<mgxx::http::async_request> m_request;
+  std::unique_ptr<mgxx::http::async_request> m_request;
   route m_route;
 
   [[nodiscard]] std::optional<std::string_view> param_view(
       std::string_view name) const;
 
  public:
-  explicit request(std::shared_ptr<mgxx::http::async_request> request,
+  explicit request(std::unique_ptr<mgxx::http::async_request> request,
                    route route);
 
   [[nodiscard]] std::string_view remote_ip() const;

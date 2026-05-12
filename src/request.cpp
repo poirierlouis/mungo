@@ -3,7 +3,7 @@
 #include "mungo/internal/route.hpp"
 
 namespace mungo {
-request::request(std::shared_ptr<mgxx::http::async_request> request,
+request::request(std::unique_ptr<mgxx::http::async_request> request,
                  route route)
     : m_request(std::move(request)), m_route(std::move(route)) {}
 

@@ -77,13 +77,13 @@ class app {
 
           // TODO: add middlewares
 
-          request request(mg_req.to_async(), it->second);
-          response response(mg_res);
-          m_executor->invoke(task([handler = it_handler->second.get(),
-                                   request = std::move(request),
-                                   response = std::move(response)]() mutable {
-            handler->invoke(std::as_const(request), std::as_const(response));
-          }));
+          m_executor->invoke(
+              task([route = it->second, handler = it_handler->second.get(),
+                    l_req = mg_req.to_async(), l_res = mg_res]() mutable {
+                const request req(std::move(l_req), std::move(route));
+                const response res(l_res);
+                handler->invoke(req, res);
+              }));
         });
   }
 
@@ -122,10 +122,11 @@ class app {
 
       m_redirect = std::format("https://{}", config.safe_host);
       m_http->on_fallback([redirect = std::string_view(m_redirect)](
-                              const auto& req, const auto& res) {
-        res->get_headers().set("Location", std::format("{}{}{}", redirect,
-                                                       req.uri(), req.query()));
-        res->send(mgxx::http::status_code::moved_permanently);
+                              const mgxx::http::request& req,
+                              mgxx::http::response& res) {
+        res.get_headers().set("Location", std::format("{}{}{}", redirect,
+                                                      req.uri(), req.query()));
+        res.send(mgxx::http::status_code::moved_permanently);
       });
     } else {
       m_https = m_server->listen_http("http://" + config.unsafe_host);
