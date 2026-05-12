@@ -8,7 +8,7 @@ constexpr auto html = R"(<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Mungo &middot; HTTP example</title>
+  <title>mungo &middot; HTTP example</title>
   <style>
     html, body {{
       width: 100%;
@@ -36,6 +36,14 @@ constexpr auto html = R"(<!DOCTYPE html>
     ul {{
       padding-left: 16px;
       list-style-type: none;
+    }}
+
+    li {{
+      margin: 4px 0;
+      padding: 4px;
+
+      border: 1px solid #616161;
+      border-radius: 4px;
     }}
 
     span.method {{
@@ -75,11 +83,15 @@ int main(int, char**) {
   std::signal(SIGINT, signal_handler);
 
   mungo::app server;
-  server.setup(
-      {
-          .unsafe_host = "localhost:80",
-      },
+
+  constexpr auto host = "localhost:4200";
+  const auto is_listening = server.setup(
+      {.unsafe_host = host},
       [](const std::string_view msg) { std::cout << "[mungo] " << msg; });
+  if (!is_listening) {
+    std::cerr << "[mungo] Failed to listen on http://" << host << '\n';
+    return 1;
+  }
 
   server.use_pool([](auto task) {
     std::thread([task = std::move(task)] { task(); }).detach();
