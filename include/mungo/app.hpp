@@ -57,6 +57,12 @@ class app {
       return;
     }
 
+    if (!m_https) {
+      MG_ERROR(("HTTPS endpoint not initialized, cannot register route: %s",
+                path.c_str()));
+      return;
+    }
+
     m_https->on_async_request(
         route->path,
         [this, path](
