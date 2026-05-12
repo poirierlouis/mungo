@@ -1,8 +1,8 @@
-#include "../include/mungo/internal/filesystem.hpp"
+#include "mungo/internal/filesystem.hpp"
 
 #include <fstream>
 
-namespace mungo {
+namespace mungo::internal {
 std::optional<std::string> filesystem::read(const std::filesystem::path& path) {
   std::ifstream file(path);
   if (!file) {

@@ -1,5 +1,5 @@
-#ifndef MUNGO_ROUTE_HPP
-#define MUNGO_ROUTE_HPP
+#ifndef MUNGO_INTERNAL_ROUTE_HPP
+#define MUNGO_INTERNAL_ROUTE_HPP
 
 #include <mgxx/mgxx.hpp>
 #include <string>
@@ -10,7 +10,9 @@
 namespace mungo {
 class request;
 class response;
+}
 
+namespace mungo::internal {
 template <typename T>
 concept route_parsable =
     std::is_integral_v<T> || std::is_same_v<T, std::string_view>;
@@ -33,4 +35,4 @@ struct route {
 using routes = std::unordered_map<uint64_t, std::vector<route>>;
 }  // namespace mungo
 
-#endif  // MUNGO_ROUTE_HPP
+#endif  // MUNGO_INTERNAL_ROUTE_HPP

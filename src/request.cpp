@@ -4,7 +4,7 @@
 
 namespace mungo {
 request::request(std::unique_ptr<mgxx::http::async_request> request,
-                 route route)
+                 internal::route route)
     : m_request(std::move(request)), m_route(std::move(route)) {}
 
 std::string_view request::remote_ip() const {

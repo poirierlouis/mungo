@@ -9,21 +9,21 @@
 namespace mungo {
 class request {
   std::unique_ptr<mgxx::http::async_request> m_request;
-  route m_route;
+  internal::route m_route;
 
   [[nodiscard]] std::optional<std::string_view> param_view(
       std::string_view name) const;
 
  public:
   explicit request(std::unique_ptr<mgxx::http::async_request> request,
-                   route route);
+                   internal::route route);
 
   [[nodiscard]] std::string_view remote_ip() const;
 
   [[nodiscard]] std::string_view method() const;
   [[nodiscard]] std::string_view path() const;
 
-  template <route_parsable T>
+  template <internal::route_parsable T>
   [[nodiscard]] std::optional<T> param(const std::string_view name) const {
     const auto param = param_view(name);
     if (!param) {

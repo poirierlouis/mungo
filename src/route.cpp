@@ -2,7 +2,7 @@
 
 #include <regex>
 
-namespace mungo {
+namespace mungo::internal {
 uint64_t route::hash(const std::string_view path) {
   return std::hash<std::string_view>{}(path);
 }

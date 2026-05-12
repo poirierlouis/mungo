@@ -1,9 +1,9 @@
-#ifndef MUNGO_TASK_HPP
-#define MUNGO_TASK_HPP
+#ifndef MUNGO_INTERNAL_TASK_HPP
+#define MUNGO_INTERNAL_TASK_HPP
 
 #include <memory>
 
-namespace mungo {
+namespace mungo::internal {
 class task {
   struct base {
     virtual ~base() = default;
@@ -39,4 +39,4 @@ class task {
 };
 }  // namespace mungo
 
-#endif  // MUNGO_TASK_HPP
+#endif  // MUNGO_INTERNAL_TASK_HPP
