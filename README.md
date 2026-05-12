@@ -27,8 +27,8 @@ for web development.
 
 ## Quick Start
 
-The following example shows how to set up a basic server with a fake thread pool
-and route handlers.
+The following example shows how to set up a basic server with
+[BS::thread_pool](https://github.com/bshoshany/thread-pool) and route handlers.
 
 ```cpp
 #include <iostream>
