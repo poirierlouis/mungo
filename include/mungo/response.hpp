@@ -3,28 +3,41 @@
 
 #include <mgxx/mgxx.hpp>
 
+#include "mungo/status_code.hpp"
+
 namespace mungo {
+class app;
+
 class response {
   std::shared_ptr<mgxx::http::async_response> m_response;
+  status_code m_status_code{status_code::internal_server_error};
+  std::string m_body;
+
+  void commit() const;
+
+  friend class app;
 
  public:
   explicit response(std::shared_ptr<mgxx::http::async_response> response);
 
-  const response& header(std::string name, std::string value) const;
+  response& header(std::string name, std::string value);
 
-  void send(mgxx::http::status_code code) const;
-  void send(mgxx::http::status_code code, std::string body) const;
+  void send(status_code code);
+  void send(status_code code, const std::string& body);
 
-  void ok() const;
-  void ok(std::string body) const;
+  void ok();
+  void ok(const std::string& body);
 
-  void created(std::string body) const;
-  void no_content() const;
+  void created(const std::string& body);
+  void no_content();
 
-  void bad_request() const;
-  void bad_request(std::string body) const;
+  void bad_request();
+  void bad_request(const std::string& body);
 
-  void not_found() const;
+  void unauthorized();
+  void unauthorized(const std::string& body);
+
+  void not_found();
 };
 }  // namespace mungo
 
