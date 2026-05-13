@@ -179,4 +179,48 @@ You can configure the server to use two-way TLS by providing:
 
 **TODO:** add getter to client's certificate info in `mungo::request`.
 
+### Middlewares / Interceptors / Filters
+You can create middlewares to handle a request before and after a route handler.
+
+In your middleware, you can call `next` with `req` and `res` objects to run the
+next handler in the chain.
+```cpp
+// Add type ids to declare and use your middlewares (compile-time).
+struct mw_logger {};
+struct mw_auth {};
+
+int main() {
+  // ...
+
+  server.use_middleware<mw_logger>([](const mungo::request& req,
+                                      mungo::response& res, auto next) {
+    std::cout << "[mungo] " << req.method() << " " << req.path() << std::endl;
+    next(req, res);
+  });
+
+  server.use_middleware<mw_auth>([](const mungo::request& req,
+                                    mungo::response& res, auto next) {
+    const auto auth = req.header("Authorization").value_or("");
+    if (auth != "Bearer c2VjcmV0") {
+      res.unauthorized("You must login");
+      return;
+    }
+
+    next(req, res);
+  });
+
+  server.get<mw_logger>("/",
+                        [](const mungo::request&, mungo::response& res) {
+    res.ok();
+  }
+
+  server.post<mw_logger, mw_auth>("/api",
+                                  [](const mungo::request&,
+                                     mungo::response& res) {
+    res.ok("Access granted");
+  }
+
+  // ...
+```
+
 For more, see `examples/` directory.
