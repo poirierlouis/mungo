@@ -1,9 +1,9 @@
 #include <BS_thread_pool.hpp>
 #include <atomic>
+#include <chrono>
 #include <csignal>
 #include <iostream>
 #include <mungo/mungo.hpp>
-#include <thread>
 
 constexpr auto html = R"(<!DOCTYPE html>
 <html lang="en">
@@ -80,6 +80,9 @@ std::atomic_bool is_running = true;
 
 void signal_handler(int) { is_running = false; }
 
+struct mw_metric_time {};
+struct mw_auth_basic {};
+
 int main(int, char**) {
   std::signal(SIGINT, signal_handler);
 
@@ -95,62 +98,97 @@ int main(int, char**) {
   }
 
   BS::thread_pool pool(std::thread::hardware_concurrency());
-  server.use_pool([&pool](auto task) {
-    pool.detach_task(std::move(task));
+  server.use_pool([&pool](auto task) { pool.detach_task(std::move(task)); });
+
+  server.use_middleware<mw_metric_time>([](const mungo::request& req,
+                                           mungo::response& res, auto next) {
+    const auto start_at = std::chrono::high_resolution_clock::now();
+    next(req, res);
+    const auto end_at = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<double> duration = end_at - start_at;
+
+    res.header("X-Metrics-Start",
+               std::to_string(start_at.time_since_epoch().count()))
+        .header("X-Metrics-End",
+                std::to_string(end_at.time_since_epoch().count()))
+        .header("X-Metrics-Duration", std::format("{:.6f}", duration.count()));
   });
 
+  server.use_middleware<mw_auth_basic>(
+      [](const mungo::request& req, mungo::response& res, auto next) {
+        const auto auth = req.header("Authorization");
+        if (!auth) {
+          res.header("WWW-Authenticate",
+                     R"(Basic realm="mungo server", charset="UTF-8")")
+              .unauthorized();
+          return;
+        }
+
+        static const std::string credentials =
+            mungo::internal::base64_encode("mungo:secret");
+        if (*auth != std::format("Basic {}", credentials)) {
+          res.unauthorized();
+          return;
+        }
+
+        next(req, res);
+      });
+
   server
-      .get("/",
-           [](const mungo::request& req, const mungo::response& res) {
-             std::string body = std::format(html, req.remote_ip());
+      .get<mw_metric_time>("/",
+                           [](const mungo::request& req, mungo::response& res) {
+                             const std::string body =
+                                 std::format(html, req.remote_ip());
 
-             res.header("Content-Type", "text/html").ok(std::move(body));
-           })
-      .get("/api/users",
-           [](const mungo::request&, const mungo::response& res) {
-             res.header("Content-Type", "application/json")
-                 .ok(R"([{"id": 42, "username": "Mungo"}])");
-           })
-      .get("/api/users/:id",
-           [](const mungo::request& req, const mungo::response& res) {
-             const auto id = req.param<uint64_t>("id");
-             if (!id) {
-               res.bad_request("Invalid user ID");
-               return;
-             }
+                             res.header("Content-Type", "text/html").ok(body);
+                           })
+      .get<mw_metric_time, mw_auth_basic>(
+          "/api/users",
+          [](const mungo::request&, mungo::response& res) {
+            res.header("Content-Type", "application/json")
+                .ok(R"([{"id": 42, "username": "Mungo"}])");
+          })
+      .get<mw_metric_time, mw_auth_basic>(
+          "/api/users/:id",
+          [](const mungo::request& req, mungo::response& res) {
+            const auto id = req.param<uint64_t>("id");
+            if (!id) {
+              res.bad_request("Invalid user ID");
+              return;
+            }
 
-             if (id != 42) {
-               res.not_found();
-               return;
-             }
+            if (id != 42) {
+              res.not_found();
+              return;
+            }
 
-             res.header("Content-Type", "application/json")
-                 .ok(R"({"id": 42, "username": "Mungo"})");
-           })
-      .post("/api/users",
-            [](const mungo::request&, const mungo::response& res) {
-              res.created("I'm a fake!");
-            })
-      .del("/api/users/:id",
-           [](const mungo::request& req, const mungo::response& res) {
-             const auto id = req.param<uint64_t>("id");
-             if (!id) {
-               res.bad_request("Invalid user ID");
-               return;
-             }
+            res.header("Content-Type", "application/json")
+                .ok(R"({"id": 42, "username": "Mungo"})");
+          })
+      .post<mw_auth_basic>("/api/users",
+                           [](const mungo::request&, mungo::response& res) {
+                             res.created("I'm a fake!");
+                           })
+      .del<mw_auth_basic>("/api/users/:id",
+                          [](const mungo::request& req, mungo::response& res) {
+                            const auto id = req.param<uint64_t>("id");
+                            if (!id) {
+                              res.bad_request("Invalid user ID");
+                              return;
+                            }
 
-             if (id != 42) {
-               res.not_found();
-               return;
-             }
+                            if (id != 42) {
+                              res.not_found();
+                              return;
+                            }
 
-             res.no_content();
-           });
+                            res.no_content();
+                          });
 
   // server.ws("/ws", [](const mungo::websocket& ws) {});
 
   while (is_running) {
-    server.poll(1);
+    server.poll(100);
   }
 
   return 0;

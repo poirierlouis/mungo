@@ -2,15 +2,21 @@
 #define MUNGO_APP_HPP
 
 #include <filesystem>
+#include <format>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
+#include "mungo/internal/cti.hpp"
 #include "mungo/internal/filesystem.hpp"
+#include "mungo/internal/middleware.hpp"
 #include "mungo/internal/route.hpp"
 #include "mungo/internal/task.hpp"
 #include "mungo/request.hpp"
 #include "mungo/response.hpp"
+#include "mungo/status_code.hpp"
 
 namespace mungo {
 struct config {
@@ -32,6 +38,8 @@ class app {
   using routes = std::unordered_map<uint64_t, internal::route>;
   using handlers =
       std::unordered_map<uint64_t, std::unique_ptr<internal::route::handler>>;
+  using middlewares = std::unordered_map<internal::type_id,
+                                         std::unique_ptr<internal::middleware>>;
 
   std::unique_ptr<mgxx::server> m_server;
   std::unique_ptr<executor> m_executor;
@@ -41,15 +49,49 @@ class app {
   std::string m_redirect;
   routes m_routes;
   handlers m_handlers;
+  middlewares m_middlewares;
 
   std::optional<internal::route> register_route(std::string_view path);
 
-  template <typename F>
+  template <typename... M, typename F>
+  auto make_chain(F&& handler) {
+    if constexpr (sizeof...(M) == 0) {
+      return [l_handler = std::forward<F>(handler)](const request& req,
+                                                    response& res) mutable {
+        l_handler(req, res);
+      };
+    } else {
+      return make_chain_recursive<M...>(std::forward<F>(handler));
+    }
+  }
+
+  template <typename M0, typename... M, typename F>
+  auto make_chain_recursive(F&& handler) {
+    auto next = make_chain<M...>(std::forward<F>(handler));
+    return [this, next = std::move(next)](const request& req,
+                                          response& res) mutable {
+      constexpr auto id = internal::get_type_id<M0>();
+      if (const auto it = m_middlewares.find(id); it != m_middlewares.end()) {
+        it->second->invoke(
+            req, res,
+            internal::middleware_task(
+                [&next](const request& l_req, response& l_res) mutable {
+                  next(l_req, l_res);
+                }));
+      } else {
+        next(req, res);
+      }
+    };
+  }
+
+  template <typename... M, typename F>
   void dispatch(const std::string_view method, const std::string& path,
                 F&& handler) {
     const auto hash = internal::route::hash(method, path);
-    m_handlers[hash] = std::make_unique<internal::route::lambda_handler<F>>(
-        std::forward<F>(handler));
+    auto chain = make_chain<M...>(std::forward<F>(handler));
+    m_handlers[hash] =
+        std::make_unique<internal::route::lambda_handler<decltype(chain)>>(
+            std::move(chain));
 
     auto route = register_route(path);
     if (!route) {
@@ -69,25 +111,26 @@ class app {
             const std::shared_ptr<mgxx::http::async_response>& mg_res) mutable {
           const auto it = m_routes.find(internal::route::hash(path));
           if (it == m_routes.end()) {
-            mg_res->send(mgxx::http::status_code::internal_server_error);
+            mg_res->send(status_code::internal_server_error);
             return;
           }
 
           const auto it_handler =
               m_handlers.find(internal::route::hash(mg_req.method(), path));
           if (it_handler == m_handlers.end()) {
-            mg_res->send(mgxx::http::status_code::not_found);
+            mg_res->send(status_code::not_found);
             return;
           }
-
-          // TODO: add middlewares
 
           m_executor->invoke(internal::task(
               [route = it->second, handler = it_handler->second.get(),
                l_req = mg_req.to_async(), l_res = mg_res]() mutable {
                 const request req(std::move(l_req), std::move(route));
-                const response res(l_res);
+                response res(l_res);
+
                 handler->invoke(req, res);
+
+                res.commit();
               }));
         });
   }
@@ -131,7 +174,7 @@ class app {
                               mgxx::http::response& res) {
         res.get_headers().set("Location", std::format("{}{}{}", redirect,
                                                       req.uri(), req.query()));
-        res.send(mgxx::http::status_code::moved_permanently);
+        res.send(status_code::moved_permanently);
       });
     } else {
       m_https = m_server->listen_http("http://" + config.unsafe_host);
@@ -149,33 +192,42 @@ class app {
         std::forward<F>(task));
   }
 
-  template <typename F>
+  template <typename T, typename F>
+  uint64_t use_middleware(F&& handler) {
+    constexpr auto id = internal::get_type_id<T>();
+    m_middlewares[id] =
+        std::make_unique<internal::lambda_middleware<std::decay_t<F>>>(
+            std::forward<F>(handler));
+    return id;
+  }
+
+  template <typename... M, typename F>
   app& get(const std::string& path, F&& handler) {
-    dispatch("GET", path, std::forward<F>(handler));
+    dispatch<M...>("GET", path, std::forward<F>(handler));
     return *this;
   }
 
-  template <typename F>
+  template <typename... M, typename F>
   app& post(const std::string& path, F&& handler) {
-    dispatch("POST", path, std::forward<F>(handler));
+    dispatch<M...>("POST", path, std::forward<F>(handler));
     return *this;
   }
 
-  template <typename F>
+  template <typename... M, typename F>
   app& put(const std::string& path, F&& handler) {
-    dispatch("PUT", path, std::forward<F>(handler));
+    dispatch<M...>("PUT", path, std::forward<F>(handler));
     return *this;
   }
 
-  template <typename F>
+  template <typename... M, typename F>
   app& patch(const std::string& path, F&& handler) {
-    dispatch("PATCH", path, std::forward<F>(handler));
+    dispatch<M...>("PATCH", path, std::forward<F>(handler));
     return *this;
   }
 
-  template <typename F>
+  template <typename... M, typename F>
   app& del(const std::string& path, F&& handler) {
-    dispatch("DELETE", path, std::forward<F>(handler));
+    dispatch<M...>("DELETE", path, std::forward<F>(handler));
     return *this;
   }
 
