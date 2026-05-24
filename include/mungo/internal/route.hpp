@@ -18,10 +18,10 @@ concept route_parsable =
     std::is_integral_v<T> || std::is_same_v<T, std::string_view>;
 
 struct route {
-  using handler = mgxx::listener<const request&, const response&>;
+  using handler = mgxx::listener<const request&, response&>;
   template <typename F>
   using lambda_handler =
-      mgxx::lambda_listener<F, const request&, const response&>;
+      mgxx::lambda_listener<F, const request&, response&>;
 
   std::string path;
   std::vector<std::string> params;

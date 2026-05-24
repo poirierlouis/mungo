@@ -5,26 +5,26 @@
 
 namespace mungo {
 class response {
-  std::shared_ptr<mgxx::http::async_response> m_response;
+  mgxx::http::async_response m_response;
 
  public:
-  explicit response(std::shared_ptr<mgxx::http::async_response> response);
+  explicit response(mgxx::http::async_response&& response);
 
-  const response& header(std::string name, std::string value) const;
+  response& header(std::string name, std::string value);
 
-  void send(mgxx::http::status_code code) const;
-  void send(mgxx::http::status_code code, std::string body) const;
+  void send(mgxx::http::status_code code);
+  void send(mgxx::http::status_code code, std::string body);
 
-  void ok() const;
-  void ok(std::string body) const;
+  void ok();
+  void ok(std::string body);
 
-  void created(std::string body) const;
-  void no_content() const;
+  void created(std::string body);
+  void no_content();
 
-  void bad_request() const;
-  void bad_request(std::string body) const;
+  void bad_request();
+  void bad_request(std::string body);
 
-  void not_found() const;
+  void not_found();
 };
 }  // namespace mungo
 

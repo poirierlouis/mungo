@@ -101,18 +101,18 @@ int main(int, char**) {
 
   server
       .get("/",
-           [](const mungo::request& req, const mungo::response& res) {
+           [](const mungo::request& req, mungo::response& res) {
              std::string body = std::format(html, req.remote_ip());
 
              res.header("Content-Type", "text/html").ok(std::move(body));
            })
       .get("/api/users",
-           [](const mungo::request&, const mungo::response& res) {
+           [](const mungo::request&, mungo::response& res) {
              res.header("Content-Type", "application/json")
                  .ok(R"([{"id": 42, "username": "Mungo"}])");
            })
       .get("/api/users/:id",
-           [](const mungo::request& req, const mungo::response& res) {
+           [](const mungo::request& req, mungo::response& res) {
              const auto id = req.param<uint64_t>("id");
              if (!id) {
                res.bad_request("Invalid user ID");
@@ -128,11 +128,11 @@ int main(int, char**) {
                  .ok(R"({"id": 42, "username": "Mungo"})");
            })
       .post("/api/users",
-            [](const mungo::request&, const mungo::response& res) {
+            [](const mungo::request&, mungo::response& res) {
               res.created("I'm a fake!");
             })
       .del("/api/users/:id",
-           [](const mungo::request& req, const mungo::response& res) {
+           [](const mungo::request& req, mungo::response& res) {
              const auto id = req.param<uint64_t>("id");
              if (!id) {
                res.bad_request("Invalid user ID");

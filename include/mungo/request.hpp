@@ -1,22 +1,20 @@
 #ifndef MUNGO_REQUEST_HPP
 #define MUNGO_REQUEST_HPP
 
-#include <memory>
 #include <mgxx/mgxx.hpp>
 
 #include "mungo/internal/route.hpp"
 
 namespace mungo {
 class request {
-  std::unique_ptr<mgxx::http::async_request> m_request;
+  mgxx::http::async_request m_request;
   internal::route m_route;
 
   [[nodiscard]] std::optional<std::string_view> param_view(
       std::string_view name) const;
 
  public:
-  explicit request(std::unique_ptr<mgxx::http::async_request> request,
-                   internal::route route);
+  explicit request(mgxx::http::async_request&& request, internal::route route);
 
   [[nodiscard]] std::string_view remote_ip() const;
 
