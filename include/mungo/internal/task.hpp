@@ -2,41 +2,42 @@
 #define MUNGO_INTERNAL_TASK_HPP
 
 #include <memory>
+#include <mgxx/mgxx.hpp>
+#include <type_traits>
+#include <utility>
+
+namespace mungo {
+class request;
+class response;
+}  // namespace mungo
 
 namespace mungo::internal {
-class task {
-  struct base {
-    virtual ~base() = default;
-    virtual void invoke() = 0;
-  };
 
-  template <typename F>
-  struct impl : base {
-   private:
-    F f;
-
-   public:
-    explicit impl(F&& func) : f(std::forward<F>(func)) {}
-
-    void invoke() override { f(); }
-  };
-
-  std::unique_ptr<base> m_ptr;
+template <typename... Args>
+class basic_task {
+  std::unique_ptr<mgxx::listener<Args...>> m_ptr;
 
  public:
   template <typename F>
-  requires (!std::is_same_v<std::remove_cvref_t<F>, task>)
-  explicit task(F&& callback)
-      : m_ptr(std::make_unique<impl<std::decay_t<F>>>(std::forward<F>(callback))) {}
+    requires(!std::is_same_v<std::remove_cvref_t<F>, basic_task>)
+  explicit basic_task(F&& callback)
+      : m_ptr(std::make_unique<mgxx::lambda_listener<std::decay_t<F>, Args...>>(
+            std::forward<F>(callback))) {}
 
-  task(const task&) = delete;
-  task& operator=(const task&) = delete;
+  basic_task(const basic_task&) = delete;
+  basic_task& operator=(const basic_task&) = delete;
 
-  task(task&&) noexcept = default;
-  task& operator=(task&&) = default;
+  basic_task(basic_task&&) noexcept = default;
+  basic_task& operator=(basic_task&&) = default;
 
-  void operator()() { m_ptr->invoke(); }
+  void operator()(Args... args) const {
+    m_ptr->invoke(std::forward<Args>(args)...);
+  }
 };
-}  // namespace mungo
+
+using task = basic_task<>;
+using middleware_task = basic_task<const request&, response&>;
+
+}  // namespace mungo::internal
 
 #endif  // MUNGO_INTERNAL_TASK_HPP
