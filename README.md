@@ -69,13 +69,13 @@ int main() {
   // 3. Define routes
   server.get("/",
              // lambda handler is executed in the thread pool.
-             [](const mungo::request& req, const mungo::response& res) {
+             [](const mungo::request& req, mungo::response& res) {
     res.header("Content-Type", "text/plain")
        .ok(std::format("Hello {}!", req.get_remote_ip()));
   });
 
   server.get("/api/users/:id",
-             [](const mungo::request& req, const mungo::response& res) {
+             [](const mungo::request& req, mungo::response& res) {
     const auto id = req.param<uint64_t>("id");
     if (!id) {
       res.bad_request("Invalid user ID");
@@ -94,7 +94,7 @@ int main() {
   // 4. Run the polling loop
   is_running = true;
   while (is_running) {
-    server.poll(1);
+    server.poll(100);
   }
 
   return 0;

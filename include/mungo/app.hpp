@@ -66,17 +66,17 @@ class app {
         route->path,
         [this, path](
             const mgxx::http::request& mg_req,
-            const std::shared_ptr<mgxx::http::async_response>& mg_res) mutable {
+            mgxx::http::async_response&& mg_res) mutable {
           const auto it = m_routes.find(internal::route::hash(path));
           if (it == m_routes.end()) {
-            mg_res->send(mgxx::http::status_code::internal_server_error);
+            mg_res.send(mgxx::http::status_code::internal_server_error);
             return;
           }
 
           const auto it_handler =
               m_handlers.find(internal::route::hash(mg_req.method(), path));
           if (it_handler == m_handlers.end()) {
-            mg_res->send(mgxx::http::status_code::not_found);
+            mg_res.send(mgxx::http::status_code::not_found);
             return;
           }
 
@@ -84,9 +84,9 @@ class app {
 
           m_executor->invoke(internal::task(
               [route = it->second, handler = it_handler->second.get(),
-               l_req = mg_req.to_async(), l_res = mg_res]() mutable {
+               l_req = mg_req.to_async(), l_res = std::move(mg_res)]() mutable {
                 const request req(std::move(l_req), std::move(route));
-                const response res(l_res);
+                response res(std::move(l_res));
                 handler->invoke(req, res);
               }));
         });
