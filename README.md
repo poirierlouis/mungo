@@ -25,32 +25,25 @@ for web development.
 - **Modern C++ API**: uses C++20 features for a type-safe and efficient
   developer experience.
 
-## Quick Start
+## Usage
 
 The following example shows how to set up a basic server with
 [BS::thread_pool](https://github.com/bshoshany/thread-pool) and route handlers.
 
+### Quick start
+
+You can setup an HTTP only server and provide a callback to handle log messages:
 ```cpp
 #include <iostream>
 
 #include <BS_thread_pool.hpp>
 #include <mungo/mungo.hpp>
 
-std::atomic_bool is_running;
-
-void signal_handler(int) {
-  std::cout << "[mungo] shutting down...\n";
-  is_running = false;
-}
-
 int main() {
-  std::signal(SIGINT, &signal_handler);
-
   mungo::app server;
 
-  // 1. Setup the server with HTTP only
   constexpr auto host = "localhost:4200";
-  const bool is_listening = server.setup(
+  const auto is_listening = server.setup(
     {.unsafe_host = host},
     [](const std::string_view msg) { std::cout << "[mungo] " << msg; }
   );
@@ -59,26 +52,55 @@ int main() {
     std::cerr << "Failed to listen on " << host << std::endl;
     return 1;
   }
+  
+  // ...
+}
+```
 
-  // 2. Tell mungo how to dispatch tasks using a thread pool
+#### Asynchronous thread-safe execution
+
+You can configure the server to use a thread pool for asynchronous request
+handling:
+```cpp
+  // ...
+
   BS::thread_pool pool(std::thread::hardware_concurrency());
   server.use_pool([&pool](auto task) {
     pool.detach_task(std::move(task));
   });
 
-  // 3. Define routes
+  // ...
+```
+
+#### Route handlers
+
+You can define routes and handle requests:
+```cpp
   server.get("/",
-             // lambda handler is executed in the thread pool.
+             // lambda is executed as a task of the thread pool.
              [](const mungo::request& req, mungo::response& res) {
     res.header("Content-Type", "text/plain")
        .ok(std::format("Hello {}!", req.get_remote_ip()));
   });
 
+  server.post("/",
+              [](const mungo::request& req, mungo::response& res) {
+    res.header("Content-Type", "application/json")
+       .created(R"({"dummy": "fake"})");
+  }
+```
+
+#### Named parameters
+
+You can declare named parameters to quickly access values from the URI:
+```cpp
+  // ...
+
   server.get("/api/users/:id",
              [](const mungo::request& req, mungo::response& res) {
     const auto id = req.param<uint64_t>("id");
     if (!id) {
-      res.bad_request("Invalid user ID");
+      res.bad_request("Missing or invalid user ID");
       return;
     }
 
@@ -91,9 +113,16 @@ int main() {
        .ok(std::format(R"({{"id": {}, "username": "mungo"}})", *id));
   });
 
-  // 4. Run the polling loop
-  is_running = true;
-  while (is_running) {
+  // ...
+```
+
+#### Polling loop
+
+You must run the server in a loop as it is event-driven:
+```cpp
+  // ...
+
+  while (true) {
     server.poll(100);
   }
 
@@ -101,4 +130,53 @@ int main() {
 }
 ```
 
-For more detailed usage, see `examples/` directory.
+### HTTPS
+
+You can configure the server to use TLS by providing:
+- paths of public certificate and private key files
+- unsafe host of the server to listen on (HTTP)
+- safe host of the server to listen on (HTTPS)
+```cpp
+  // ...
+
+  const auto is_listening = server.setup(
+    {
+      .unsafe_host = "localhost:80",
+      .safe_host = "localhost:443",
+      .cert = "path/to/server.crt",
+      .key = "path/to/server.key",
+    },
+    [](const std::string_view msg) { std::cout << "[mungo] " << msg; }
+  );
+
+  // ...
+```
+
+It will automatically redirect HTTP requests to HTTPS using a 
+`301 Moved Permanently` status code.
+
+### mTLS
+
+You can configure the server to use two-way TLS by providing:
+- path of a certificate authority file
+- same as HTTPS above
+```cpp
+  // ...
+
+  const auto is_listening = server.setup(
+    {
+      .unsafe_host = "0.0.0.0:80",
+      .safe_host = "0.0.0.0:443",
+      .ca = "path/to/root.pem",
+      .cert = "path/to/server.crt",
+      .key = "path/to/server.key",
+    },
+    [](const std::string_view msg) { std::cout << "[mungo] " << msg; }
+  );
+
+  // ...
+```
+
+**TODO:** add getter to client's certificate info in `mungo::request`.
+
+For more, see `examples/` directory.
