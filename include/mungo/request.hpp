@@ -17,6 +17,8 @@ class request {
   explicit request(mgxx::http::async_request&& request, internal::route route);
 
   [[nodiscard]] std::string_view remote_ip() const;
+  [[nodiscard]] bool is_mtls() const;
+  [[nodiscard]] const mgxx::tls_cert_info& tls_cert_info() const;
 
   [[nodiscard]] std::string_view method() const;
   [[nodiscard]] std::string_view path() const;
