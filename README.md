@@ -177,7 +177,24 @@ You can configure the server to use two-way TLS by providing:
   // ...
 ```
 
-**TODO:** add getter to client's certificate info in `mungo::request`.
+You can access the client's certificate info from the request:
+```cpp
+  // ...
+
+  server.get("/", [](const mungo::request& req, mungo::response& res) {
+    if (!req.is_mtls()) {
+      res.unauthorized("Missing client certificate");
+      return;
+    }
+
+    const auto& cert = req.tls_cert_info();
+    res.header("Content-Type", "application/json")
+        .ok(std::format(R"({{"subject": "{}", "serial_no": "{}"}})",
+                        cert.get_subject_name(), cert.get_serial_number()));
+  });
+
+  // ...
+```
 
 ### Middlewares / Interceptors / Filters
 You can create middlewares to handle a request before and after a route handler.

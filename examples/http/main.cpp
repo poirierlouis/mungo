@@ -78,13 +78,13 @@ constexpr auto html = R"(<!DOCTYPE html>
 
 std::atomic_bool is_running = true;
 
-void signal_handler(int) { is_running = false; }
+void handle_signal(int) { is_running = false; }
 
 struct mw_metric_time {};
 struct mw_auth_basic {};
 
 int main(int, char**) {
-  std::signal(SIGINT, signal_handler);
+  std::signal(SIGINT, handle_signal);
 
   mungo::app server;
 
