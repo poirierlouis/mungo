@@ -16,6 +16,7 @@
 #include "mungo/internal/task.hpp"
 #include "mungo/request.hpp"
 #include "mungo/response.hpp"
+#include "mungo/router.hpp"
 #include "mungo/status_code.hpp"
 
 namespace mungo {
@@ -38,8 +39,9 @@ class app {
   using routes = std::unordered_map<uint64_t, internal::route>;
   using handlers =
       std::unordered_map<uint64_t, std::unique_ptr<internal::route::handler>>;
-  using middlewares = std::unordered_map<internal::type_id,
-                                         std::unique_ptr<internal::middleware>>;
+  using middlewares =
+      std::unordered_map<internal::type_id,
+                         std::unique_ptr<internal::middleware_listener>>;
 
   std::unique_ptr<mgxx::server> m_server;
   std::unique_ptr<executor> m_executor;
@@ -53,24 +55,24 @@ class app {
 
   std::optional<internal::route> register_route(std::string_view path);
 
-  template <typename... M, typename F>
+  template <is_mw... Middlewares, typename F>
   auto make_chain(F&& handler) {
-    if constexpr (sizeof...(M) == 0) {
+    if constexpr (sizeof...(Middlewares) == 0) {
       return [l_handler = std::forward<F>(handler)](const request& req,
                                                     response& res) mutable {
         l_handler(req, res);
       };
     } else {
-      return make_chain_recursive<M...>(std::forward<F>(handler));
+      return make_chain_recursive<Middlewares...>(std::forward<F>(handler));
     }
   }
 
-  template <typename M0, typename... M, typename F>
+  template <is_mw Middleware0, is_mw... Middlewares, typename F>
   auto make_chain_recursive(F&& handler) {
-    auto next = make_chain<M...>(std::forward<F>(handler));
+    auto next = make_chain<Middlewares...>(std::forward<F>(handler));
     return [this, next = std::move(next)](const request& req,
                                           response& res) mutable {
-      constexpr auto id = internal::get_type_id<M0>();
+      constexpr auto id = internal::get_type_id<Middleware0>();
       if (const auto it = m_middlewares.find(id); it != m_middlewares.end()) {
         it->second->invoke(
             req, res,
@@ -84,11 +86,11 @@ class app {
     };
   }
 
-  template <typename... M, typename F>
-  void dispatch(const std::string_view method, const std::string& path,
-                F&& handler) {
+  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  void dispatch(const std::string_view method, F&& handler) {
+    constexpr auto path = Uri.view();
     const auto hash = internal::route::hash(method, path);
-    auto chain = make_chain<M...>(std::forward<F>(handler));
+    auto chain = make_chain<Middlewares...>(std::forward<F>(handler));
     m_handlers[hash] =
         std::make_unique<internal::route::lambda_handler<decltype(chain)>>(
             std::move(chain));
@@ -99,16 +101,14 @@ class app {
     }
 
     if (!m_https) {
-      MG_ERROR(("HTTPS endpoint not initialized, cannot register route: %s",
-                path.c_str()));
+      MG_ERROR(("HTTPS endpoint not initialized, cannot register route: %.*s",
+                path.size(), path.data()));
       return;
     }
 
     m_https->on_async_request(
-        route->path,
-        [this, path](
-            const mgxx::http::request& mg_req,
-            mgxx::http::async_response&& mg_res) mutable {
+        route->path, [this, path](const mgxx::http::request& mg_req,
+                                  mgxx::http::async_response&& mg_res) mutable {
           const auto it = m_routes.find(internal::route::hash(path));
           if (it == m_routes.end()) {
             mg_res.send(status_code::internal_server_error);
@@ -195,43 +195,51 @@ class app {
   uint64_t use_middleware(F&& handler) {
     constexpr auto id = internal::get_type_id<T>();
     m_middlewares[id] =
-        std::make_unique<internal::lambda_middleware<std::decay_t<F>>>(
+        std::make_unique<internal::lambda_middleware_listener<std::decay_t<F>>>(
             std::forward<F>(handler));
     return id;
   }
 
-  template <typename... M, typename F>
-  app& get(const std::string& path, F&& handler) {
-    dispatch<M...>("GET", path, std::forward<F>(handler));
+  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  app& get(F&& handler) {
+    dispatch<Uri, Middlewares...>("GET", std::forward<F>(handler));
     return *this;
   }
 
-  template <typename... M, typename F>
-  app& post(const std::string& path, F&& handler) {
-    dispatch<M...>("POST", path, std::forward<F>(handler));
+  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  app& post(F&& handler) {
+    dispatch<Uri, Middlewares...>("POST", std::forward<F>(handler));
     return *this;
   }
 
-  template <typename... M, typename F>
-  app& put(const std::string& path, F&& handler) {
-    dispatch<M...>("PUT", path, std::forward<F>(handler));
+  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  app& put(F&& handler) {
+    dispatch<Uri, Middlewares...>("PUT", std::forward<F>(handler));
     return *this;
   }
 
-  template <typename... M, typename F>
-  app& patch(const std::string& path, F&& handler) {
-    dispatch<M...>("PATCH", path, std::forward<F>(handler));
+  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  app& patch(F&& handler) {
+    dispatch<Uri, Middlewares...>("PATCH", std::forward<F>(handler));
     return *this;
   }
 
-  template <typename... M, typename F>
-  app& del(const std::string& path, F&& handler) {
-    dispatch<M...>("DELETE", path, std::forward<F>(handler));
+  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  app& del(F&& handler) {
+    dispatch<Uri, Middlewares...>("DELETE", std::forward<F>(handler));
     return *this;
+  }
+
+  template <internal::fixed_string Uri, is_mw... Middlewares>
+  auto router() {
+    constexpr auto path = internal::strip_end<Uri>();
+    return mungo::basic_router<path, Middlewares...>{*this};
   }
 
   void poll(int ms) const;
 };
 }  // namespace mungo
+
+#include "mungo/router-inl.hpp"
 
 #endif  // MUNGO_APP_HPP

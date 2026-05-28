@@ -135,21 +135,18 @@ int main(int, char**) {
       });
 
   server
-      .get<mw_metric_time>("/",
-                           [](const mungo::request& req, mungo::response& res) {
-                             const std::string body =
-                                 std::format(html, req.remote_ip());
+      .get<"/", mw_metric_time>(
+          [](const mungo::request& req, mungo::response& res) {
+            const std::string body = std::format(html, req.remote_ip());
 
-                             res.header("Content-Type", "text/html").ok(body);
-                           })
-      .get<mw_metric_time, mw_auth_basic>(
-          "/api/users",
+            res.header("Content-Type", "text/html").ok(body);
+          })
+      .get<"/api/users", mw_metric_time, mw_auth_basic>(
           [](const mungo::request&, mungo::response& res) {
             res.header("Content-Type", "application/json")
                 .ok(R"([{"id": 42, "username": "Mungo"}])");
           })
-      .get<mw_metric_time, mw_auth_basic>(
-          "/api/users/:id",
+      .get<"/api/users/:id", mw_metric_time, mw_auth_basic>(
           [](const mungo::request& req, mungo::response& res) {
             const auto id = req.param<uint64_t>("id");
             if (!id) {
@@ -165,25 +162,25 @@ int main(int, char**) {
             res.header("Content-Type", "application/json")
                 .ok(R"({"id": 42, "username": "Mungo"})");
           })
-      .post<mw_auth_basic>("/api/users",
-                           [](const mungo::request&, mungo::response& res) {
-                             res.created("I'm a fake!");
-                           })
-      .del<mw_auth_basic>("/api/users/:id",
-                          [](const mungo::request& req, mungo::response& res) {
-                            const auto id = req.param<uint64_t>("id");
-                            if (!id) {
-                              res.bad_request("Invalid user ID");
-                              return;
-                            }
+      .post<"/api/users", mw_auth_basic>(
+          [](const mungo::request&, mungo::response& res) {
+            res.created("I'm a fake!");
+          })
+      .del<"/api/users/:id", mw_auth_basic>(
+          [](const mungo::request& req, mungo::response& res) {
+            const auto id = req.param<uint64_t>("id");
+            if (!id) {
+              res.bad_request("Invalid user ID");
+              return;
+            }
 
-                            if (id != 42) {
-                              res.not_found();
-                              return;
-                            }
+            if (id != 42) {
+              res.not_found();
+              return;
+            }
 
-                            res.no_content();
-                          });
+            res.no_content();
+          });
 
   while (is_running) {
     server.poll(100);

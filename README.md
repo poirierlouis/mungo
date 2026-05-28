@@ -14,6 +14,10 @@ for web development.
   `put`, `patch`, `del`).
 - **Dynamic Route Parameters**: support for named parameters in routes (e.g., 
   `/api/users/:id`).
+- **Middleware Support**: flexible mechanism to handle requests before and after
+  route handlers.
+- **Compile-time Routers**: group endpoints together with automatic middleware
+  inheritance and URI resolution.
 - **Agnostic Backend**: minimal abstractions over the underlying `mgxx` backend
   while maintaining high flexibility.
 - **Async Execution**: built-in support for asynchronous request handling,
@@ -76,18 +80,15 @@ handling:
 
 You can define routes and handle requests:
 ```cpp
-  server.get("/",
-             // lambda is executed as a task of the thread pool.
-             [](const mungo::request& req, mungo::response& res) {
-    res.header("Content-Type", "text/plain")
-       .ok(std::format("Hello {}!", req.get_remote_ip()));
+  server.get<"/">(// lambda is executed as a task of the thread pool.
+                  [](const mungo::request& req, mungo::response& res) {
+    res.ok(std::format("Hello {}!", req.get_remote_ip()));
   });
 
-  server.post("/",
-              [](const mungo::request& req, mungo::response& res) {
+  server.post<"/">([](const mungo::request& req, mungo::response& res) {
     res.header("Content-Type", "application/json")
        .created(R"({"dummy": "fake"})");
-  }
+  });
 ```
 
 #### Named parameters
@@ -96,11 +97,11 @@ You can declare named parameters to quickly access values from the URI:
 ```cpp
   // ...
 
-  server.get("/api/users/:id",
-             [](const mungo::request& req, mungo::response& res) {
+  server.get<"/api/users/:id">([](const mungo::request& req,
+                                  mungo::response& res) {
     const auto id = req.param<uint64_t>("id");
     if (!id) {
-      res.bad_request("Missing or invalid user ID");
+      res.bad_request("Invalid user ID");
       return;
     }
 
@@ -181,7 +182,7 @@ You can access the client's certificate info from the request:
 ```cpp
   // ...
 
-  server.get("/", [](const mungo::request& req, mungo::response& res) {
+  server.get<"/">([](const mungo::request& req, mungo::response& res) {
     if (!req.is_mtls()) {
       res.unauthorized("Missing client certificate");
       return;
@@ -189,8 +190,8 @@ You can access the client's certificate info from the request:
 
     const auto& cert = req.tls_cert_info();
     res.header("Content-Type", "application/json")
-        .ok(std::format(R"({{"subject": "{}", "serial_no": "{}"}})",
-                        cert.get_subject_name(), cert.get_serial_number()));
+       .ok(std::format(R"({{"subject": "{}", "serial_no": "{}"}})",
+                       cert.get_subject_name(), cert.get_serial_number()));
   });
 
   // ...
@@ -226,18 +227,53 @@ int main() {
     next(req, res);
   });
 
-  server.get<mw_logger>("/",
-                        [](const mungo::request&, mungo::response& res) {
+  server.get<"/", mw_logger>([](const mungo::request&, mungo::response& res) {
     res.ok();
   }
 
-  server.post<mw_logger, mw_auth>("/api",
-                                  [](const mungo::request&,
-                                     mungo::response& res) {
+  server.post<"/api", mw_logger, mw_auth>([](const mungo::request&,
+                                             mungo::response& res) {
     res.ok("Access granted");
   }
 
   // ...
 ```
+
+### Routers
+
+You can create routers to group endpoints together. It will automatically 
+include middlewares of the parent router. URI is resolved at compile-time.
+
+```cpp
+  // ...
+
+  const auto api = server.router<"/api", mw_auth>();
+
+  auto users = api.router<"/users", mw_auth_users>();
+  users
+      .get<"/">([](const mungo::request& req, mungo::response& res) {
+        res.ok();
+      })
+      .get<"/:id">([](const mungo::request& req, mungo::response& res) {
+        res.ok();
+      })
+      .post<"/">([](const mungo::request& req, mungo::response& res) {
+        res.created("R({"id": null})");
+      })
+      .del<"/:id">([](const mungo::request& req, mungo::response& res) {
+        res.no_content();
+      });
+
+  // ...
+```
+
+It will always strip slashes at the end of a URI. It means that `/api//` will
+become `/api`. This rule is applied when using `router<>` and HTTP methods
+`get<>`, `post<>`, `put<>`, `patch<>`, `del<>`. Finally, when you only define a
+single slash like `get<"/">` it will be treated as `get<"">` under the hood.
+
+> [!NOTE]
+> It is currently impossible to disable parent middlewares. This might be
+> introduced later using a `mungo::not<>` template type.
 
 For more, see `examples/` directory.
