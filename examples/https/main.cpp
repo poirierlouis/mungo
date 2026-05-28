@@ -113,7 +113,7 @@ int main(int, char**) {
         next(req, res);
       });
 
-  server.get("/", [](const mungo::request& req, mungo::response& res) {
+  server.get<"/">([](const mungo::request& req, mungo::response& res) {
     const auto& cert = req.tls_cert_info();
     if (cert.get_subject_name() == "CN=mgxx-client" &&
         cert.get_serial_number() == k_serial_no) {
@@ -126,8 +126,8 @@ int main(int, char**) {
         .ok(std::format(html_anonymous, req.remote_ip()));
   });
 
-  server.get<mw_auth_mtls>(
-      "/app", [](const mungo::request& req, mungo::response& res) {
+  server.get<"/app", mw_auth_mtls>(
+      [](const mungo::request& req, mungo::response& res) {
         const auto& cert = req.tls_cert_info();
         const auto subject = cert.get_subject_name().substr(3);
         res.header("Content-Type", "text/html")
