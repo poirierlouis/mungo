@@ -279,11 +279,15 @@ single slash like `get<"/">` it will be treated as `get<"">` under the hood.
 
 ### Attributes
 
-You can attach custom attributes to requests using middlewares. You can declare
-as many attributes as you want. You need to provide a specialization of your
-attributes to be used by the framework. Access to an attribute is `O(1)` thanks
-to compile-time type-safe lookup. A request will only grow in memory as you
-attach attributes.
+You can attach custom attributes to requests using middleware. You can declare
+as many attributes as you want; simply provide your custom attribute type list
+as a template specialization to the framework configuration.
+
+Accessing an attribute is an `O(1)` operation thanks to compile-time, type-safe
+lookup. Because the framework packs these variants inside a fixed-size
+`std::array` directly within the request object, memory footprint is fully
+calculated at compile-time. This guarantees zero dynamic heap allocations and
+maximum CPU cache locality during the request lifecycle.
 ```cpp
 // Include customization point header.
 #include <mungo/attributes.hpp>

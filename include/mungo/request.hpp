@@ -1,12 +1,12 @@
 #ifndef MUNGO_REQUEST_HPP
 #define MUNGO_REQUEST_HPP
 
+#include <array>
 #include <mgxx/mgxx.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
-#include <vector>
 
 #include "mungo/internal/meta.hpp"
 #include "mungo/internal/request_fwd.hpp"
@@ -18,7 +18,7 @@ template <typename Attrs>
 class basic_request {
   mgxx::http::async_request m_request;
   internal::route m_route;
-  std::vector<Attrs> m_attributes;
+  std::array<Attrs, std::variant_size_v<Attrs>> m_attributes;
 
   [[nodiscard]] std::optional<std::string_view> param_view(
       const std::string_view name) const {
@@ -33,9 +33,7 @@ class basic_request {
  public:
   explicit basic_request(mgxx::http::async_request&& request,
                          internal::route route)
-      : m_request(std::move(request)),
-        m_route(std::move(route)),
-        m_attributes(std::variant_size_v<Attrs>) {}
+      : m_request(std::move(request)), m_route(std::move(route)) {}
 
   [[nodiscard]] std::string_view remote_ip() const {
     return m_request.get_remote_ip();
@@ -82,13 +80,6 @@ class basic_request {
   }
 
   [[nodiscard]] std::string_view body() const { return m_request.body(); }
-
-  template <typename T>
-    requires internal::is_attribute_valid<T, Attrs>
-  void attr(T&& value) {
-    constexpr std::size_t idx = internal::type_index_v<T, Attrs>;
-    m_attributes[idx].template emplace<T>(std::forward<T>(value));
-  }
 
   template <typename T, typename... Args>
     requires internal::is_attribute_valid<T, Attrs>
