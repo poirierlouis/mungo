@@ -8,6 +8,7 @@
 #include "mungo/request.hpp"
 #include "mungo/response.hpp"
 #include "mungo/router.hpp"
+#include "mungo/optional.hpp"
 #include "mungo/status_code.hpp"
 // clang-format on
 

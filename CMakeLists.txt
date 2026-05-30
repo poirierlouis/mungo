@@ -15,6 +15,7 @@ FetchContent_MakeAvailable(mgxx)
 add_library(${PROJECT_NAME} STATIC
         src/app.cpp
         src/filesystem.cpp
+        src/optional.cpp
         src/request.cpp
         src/response.cpp
         src/route.cpp)

@@ -100,22 +100,18 @@ int main(int, char**) {
   BS::thread_pool pool(std::thread::hardware_concurrency());
   server.use_pool([&pool](auto task) { pool.detach_task(std::move(task)); });
 
-  server.use_middleware<mw_metric_time>([](const mungo::request& req,
-                                           mungo::response& res, auto next) {
-    const auto start_at = std::chrono::high_resolution_clock::now();
-    next(req, res);
-    const auto end_at = std::chrono::high_resolution_clock::now();
-    const std::chrono::duration<double> duration = end_at - start_at;
+  server.use_middleware<mw_metric_time>(
+      [](mungo::request& req, mungo::response& res, auto next) {
+        const auto start_at = std::chrono::high_resolution_clock::now();
+        next(req, res);
+        const auto end_at = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> duration = end_at - start_at;
 
-    res.header("X-Metrics-Start",
-               std::to_string(start_at.time_since_epoch().count()))
-        .header("X-Metrics-End",
-                std::to_string(end_at.time_since_epoch().count()))
-        .header("X-Metrics-Duration", std::format("{:.6f}", duration.count()));
-  });
+        res.header("X-Duration", std::format("{:.6f}", duration.count()));
+      });
 
   server.use_middleware<mw_auth_basic>(
-      [](const mungo::request& req, mungo::response& res, auto next) {
+      [](mungo::request& req, mungo::response& res, auto next) {
         const auto auth = req.header("Authorization");
         if (!auth) {
           res.header("WWW-Authenticate",

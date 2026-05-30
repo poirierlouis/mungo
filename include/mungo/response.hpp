@@ -37,6 +37,9 @@ class response {
   void unauthorized();
   void unauthorized(std::string body);
 
+  void forbidden();
+  void forbidden(std::string body);
+
   void not_found();
 };
 }  // namespace mungo

@@ -6,8 +6,9 @@
 #include <type_traits>
 #include <utility>
 
+#include "mungo/internal/request_fwd.hpp"
+
 namespace mungo {
-class request;
 class response;
 }  // namespace mungo
 
@@ -36,7 +37,7 @@ class basic_task {
 };
 
 using task = basic_task<>;
-using middleware_task = basic_task<const request&, response&>;
+using middleware_task = basic_task<request&, response&>;
 
 }  // namespace mungo::internal
 

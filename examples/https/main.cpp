@@ -97,7 +97,7 @@ int main(int, char**) {
   server.use_pool([&pool](auto task) { pool.detach_task(std::move(task)); });
 
   server.use_middleware<mw_auth_mtls>(
-      [](const mungo::request& req, mungo::response& res, auto next) {
+      [](mungo::request& req, mungo::response& res, auto next) {
         if (!req.is_mtls()) {
           res.unauthorized("Missing client certificate");
           return;

@@ -11,3 +11,4 @@ target_include_directories(BS_thread_pool INTERFACE "${bs_thread_pool_SOURCE_DIR
 add_subdirectory(http/)
 add_subdirectory(https/)
 add_subdirectory(router/)
+add_subdirectory(attrs/)
