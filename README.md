@@ -18,6 +18,7 @@ for web development.
   route handlers.
 - **Compile-time Routers**: group endpoints together with automatic middleware
   inheritance and URI resolution.
+- **Custom attributes**: attach custom attributes to requests using middlewares.
 - **Agnostic Backend**: minimal abstractions over the underlying `mgxx` backend
   while maintaining high flexibility.
 - **Async Execution**: built-in support for asynchronous request handling,
@@ -210,13 +211,13 @@ struct mw_auth {};
 int main() {
   // ...
 
-  server.use_middleware<mw_logger>([](const mungo::request& req,
+  server.use_middleware<mw_logger>([](mungo::request& req,
                                       mungo::response& res, auto next) {
     std::cout << "[mungo] " << req.method() << " " << req.path() << std::endl;
     next(req, res);
   });
 
-  server.use_middleware<mw_auth>([](const mungo::request& req,
+  server.use_middleware<mw_auth>([](mungo::request& req,
                                     mungo::response& res, auto next) {
     const auto auth = req.header("Authorization").value_or("");
     if (auth != "Bearer c2VjcmV0") {
@@ -275,5 +276,61 @@ single slash like `get<"/">` it will be treated as `get<"">` under the hood.
 > [!NOTE]
 > It is currently impossible to disable parent middlewares. This might be
 > introduced later using a `mungo::not<>` template type.
+
+### Attributes
+
+You can attach custom attributes to requests using middlewares. You can declare
+as many attributes as you want. You need to provide a specialization of your
+attributes to be used by the framework. Access to an attribute is `O(1)` thanks
+to compile-time type-safe lookup. A request will only grow in memory as you
+attach attributes.
+```cpp
+// Include customization point header.
+#include <mungo/attributes.hpp>
+
+struct user_session {
+  std::string email;
+};
+
+// Inject types into mungo's attribute system BEFORE including
+// <mungo/mungo.hpp>. This specialization is picked up when the `mungo::request`
+// alias is resolved.
+template <>
+struct mungo::custom_attrs<> {
+  using type = std::variant<user_session>;
+};
+
+// Include mungo header.
+#include <mungo/mungo.hpp>
+
+struct mw_auth {};
+
+int main() {
+  // ...
+
+  server.use_middleware<mw_auth>([](mungo::request& req,
+                                    mungo::response& res, auto next) {
+    req.attr<user_session>("mungo@mungo.com");
+    next(req, res);
+
+    // You would normally extract some data from a header, cross-check with a
+    // database, validate credentials, set the attribute and keep on.
+  });
+
+  server.get<"/", mw_auth>([](const mungo::request& req,
+                              mungo::response& res) {
+    const auto user = req.attr<user_session>();
+    if (!user) {
+      // You should not even need to check for the attribute presence as long as
+      // your middleware cover all cases.
+      res.unauthorized("Missing user session");
+      return;
+    }
+
+    res.ok(std::format("User is {}", user->email));
+  });
+
+  // ...
+```
 
 For more, see `examples/` directory.

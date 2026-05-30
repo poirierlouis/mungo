@@ -3,6 +3,7 @@
 
 #include "mungo/internal/cti.hpp"
 #include "mungo/internal/middleware.hpp"
+#include "mungo/internal/route.hpp"
 
 namespace mungo {
 class app;
@@ -20,19 +21,24 @@ class basic_router {
     return basic_router<path, MiddlewaresBase..., Middlewares...>{m_app};
   }
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   basic_router& get(F&& handler);
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   basic_router& post(F&& handler);
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   basic_router& put(F&& handler);
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   basic_router& patch(F&& handler);
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   basic_router& del(F&& handler);
 };
 }  // namespace mungo

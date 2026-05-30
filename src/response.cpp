@@ -35,6 +35,11 @@ void response::unauthorized(std::string body) {
   send(status_code::unauthorized, std::move(body));
 }
 
+void response::forbidden() { send(status_code::forbidden); }
+void response::forbidden(std::string body) {
+  send(status_code::forbidden, std::move(body));
+}
+
 void response::not_found() { send(status_code::not_found); }
 
 void response::commit() { m_response.send(m_status_code, m_body); }

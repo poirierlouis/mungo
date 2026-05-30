@@ -60,7 +60,7 @@ class app {
     if constexpr (sizeof...(Middlewares) == 0) {
       return [l_handler = std::forward<F>(handler)](const request& req,
                                                     response& res) mutable {
-        l_handler(req, res);
+        l_handler(static_cast<const request&>(req), res);
       };
     } else {
       return make_chain_recursive<Middlewares...>(std::forward<F>(handler));
@@ -70,14 +70,13 @@ class app {
   template <is_mw Middleware0, is_mw... Middlewares, typename F>
   auto make_chain_recursive(F&& handler) {
     auto next = make_chain<Middlewares...>(std::forward<F>(handler));
-    return [this, next = std::move(next)](const request& req,
-                                          response& res) mutable {
+    return [this, next = std::move(next)](request& req, response& res) mutable {
       constexpr auto id = internal::get_type_id<Middleware0>();
       if (const auto it = m_middlewares.find(id); it != m_middlewares.end()) {
         it->second->invoke(
             req, res,
             internal::middleware_task(
-                [&next](const request& l_req, response& l_res) mutable {
+                [&next](request& l_req, response& l_res) mutable {
                   next(l_req, l_res);
                 }));
       } else {
@@ -86,7 +85,8 @@ class app {
     };
   }
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   void dispatch(const std::string_view method, F&& handler) {
     constexpr auto path = Uri.view();
     const auto hash = internal::route::hash(method, path);
@@ -125,7 +125,7 @@ class app {
           m_executor->invoke(internal::task(
               [route = it->second, handler = it_handler->second.get(),
                l_req = mg_req.to_async(), l_res = std::move(mg_res)]() mutable {
-                const request req(std::move(l_req), std::move(route));
+                request req(std::move(l_req), std::move(route));
                 response res(std::move(l_res));
                 handler->invoke(req, res);
 
@@ -191,7 +191,7 @@ class app {
         std::forward<F>(task));
   }
 
-  template <typename T, typename F>
+  template <is_mw T, middleware_handler F>
   uint64_t use_middleware(F&& handler) {
     constexpr auto id = internal::get_type_id<T>();
     m_middlewares[id] =
@@ -200,31 +200,36 @@ class app {
     return id;
   }
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   app& get(F&& handler) {
     dispatch<Uri, Middlewares...>("GET", std::forward<F>(handler));
     return *this;
   }
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   app& post(F&& handler) {
     dispatch<Uri, Middlewares...>("POST", std::forward<F>(handler));
     return *this;
   }
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   app& put(F&& handler) {
     dispatch<Uri, Middlewares...>("PUT", std::forward<F>(handler));
     return *this;
   }
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   app& patch(F&& handler) {
     dispatch<Uri, Middlewares...>("PATCH", std::forward<F>(handler));
     return *this;
   }
 
-  template <internal::fixed_string Uri, is_mw... Middlewares, typename F>
+  template <internal::fixed_string Uri, is_mw... Middlewares,
+            internal::route_handler F>
   app& del(F&& handler) {
     dispatch<Uri, Middlewares...>("DELETE", std::forward<F>(handler));
     return *this;

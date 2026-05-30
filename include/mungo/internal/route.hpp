@@ -7,8 +7,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "mungo/internal/request_fwd.hpp"
+
 namespace mungo {
-class request;
 class response;
 }  // namespace mungo
 
@@ -17,10 +18,13 @@ template <typename T>
 concept route_parsable =
     std::is_integral_v<T> || std::is_same_v<T, std::string_view>;
 
+template <typename F>
+concept route_handler = std::is_invocable_v<F, const request&, response&>;
+
 struct route {
-  using handler = mgxx::listener<const request&, response&>;
+  using handler = mgxx::listener<request&, response&>;
   template <typename F>
-  using lambda_handler = mgxx::lambda_listener<F, const request&, response&>;
+  using lambda_handler = mgxx::lambda_listener<F, request&, response&>;
 
   std::string path;
   std::vector<std::string> params;
