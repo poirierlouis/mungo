@@ -137,11 +137,15 @@ int main(int, char**) {
 
             res.header("Content-Type", "text/html").ok(body);
           })
-      .get<"/api/users", mw_metric_time, mw_auth_basic>(
-          [](const mungo::request&, mungo::response& res) {
-            res.header("Content-Type", "application/json")
-                .ok(R"([{"id": 42, "username": "Mungo"}])");
-          })
+      .get<"/api/users", mw_metric_time,
+           mw_auth_basic>([](const mungo::request& req, mungo::response& res) {
+        const auto query = req.query<std::string, 128>("q").value_or("");
+        const auto limit = req.query<uint32_t>("limit").value_or(50);
+        res.header("Content-Type", "application/json")
+            .ok(std::format(
+                R"({{"query": "{}", "limit": {}, "users": [{{"id": 42, "username": "Mungo"}}]}})",
+                query, limit));
+      })
       .get<"/api/users/:id", mw_metric_time, mw_auth_basic>(
           [](const mungo::request& req, mungo::response& res) {
             const auto id = req.param<uint64_t>("id");

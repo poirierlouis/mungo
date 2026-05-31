@@ -20,6 +20,19 @@ class basic_request {
   internal::route m_route;
   std::array<Attrs, std::variant_size_v<Attrs>> m_attributes;
 
+  template <typename T>
+    requires std::is_integral_v<T>
+  [[nodiscard]] static std::optional<T> get_number(const std::string_view str) {
+    T value;
+    const auto [ptr, err] =
+        std::from_chars(str.data(), str.data() + str.size(), value);
+    if (err != std::errc{}) {
+      return std::nullopt;
+    }
+
+    return value;
+  }
+
   [[nodiscard]] std::optional<std::string_view> param_view(
       const std::string_view name) const {
     for (std::size_t i = 0; i < m_route.params.size(); ++i) {
@@ -52,7 +65,7 @@ class basic_request {
             m_request.uri().size() + m_request.query().size()};
   }
 
-  template <internal::route_parsable T>
+  template <internal::route_param_parsable T>
   [[nodiscard]] std::optional<T> param(const std::string_view name) const {
     const auto param = param_view(name);
     if (!param) {
@@ -62,15 +75,26 @@ class basic_request {
     if constexpr (std::same_as<T, std::string_view>) {
       return param.value();
     } else {
-      T value;
-      const auto [ptr, err] =
-          std::from_chars(param.value().data(),
-                          param.value().data() + param.value().size(), value);
-      if (err == std::errc{}) {
-        return value;
-      }
+      return basic_request::get_number<T>(param.value());
+    }
+  }
 
+  template <internal::route_query_param_parsable T, size_t N = 1024>
+  [[nodiscard]] std::optional<T> query(const std::string_view name) const {
+    const auto param = m_request.get_query_param(name);
+    if (!param) {
       return std::nullopt;
+    }
+
+    if constexpr (std::same_as<T, std::string>) {
+      return mgxx::http::decode_url<N>(param.value());
+    } else if constexpr (std::same_as<T, bool>) {
+      return param.value() == "true" || param.value() == "1" ||
+             param.value() == "on" || param.value() == "yes" ||
+             param.value() == "enabled" || param.value() == "y" ||
+             param.value() == "t";
+    } else {
+      return basic_request::get_number<T>(param.value());
     }
   }
 

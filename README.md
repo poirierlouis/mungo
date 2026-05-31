@@ -14,6 +14,7 @@ for web development.
   `put`, `patch`, `del`).
 - **Dynamic Route Parameters**: support for named parameters in routes (e.g., 
   `/api/users/:id`).
+- **Query Parameters**: support for decoding and parsing query parameters.
 - **Middleware Support**: flexible mechanism to handle requests before and after
   route handlers.
 - **Compile-time Routers**: group endpoints together with automatic middleware
@@ -116,6 +117,43 @@ You can declare named parameters to quickly access values from the URI:
   });
 
   // ...
+```
+
+#### Query parameters
+
+You can access query parameters from the URI. It can parse the value to:
+
+- a number (integer-like)
+- a boolean (strictly equal to either `true`, `t`, `yes`, `y`, `1`, `on`,
+  `enabled`)
+- a string (URL decoding is performed)
+
+```cpp
+  // ...
+
+  server.get<"/api/users">([](const mungo::request& req, mungo::response& res) {
+    const auto page = req.query<int>("page");
+    if (!page) {
+      res.bad_request("Invalid page number");
+      return;
+    }
+    if (*page < 1) {
+      res.bad_request("Page number must be greater than 0");
+      return;
+    }
+
+    // ...
+  });
+
+  // ...
+```
+
+URL decoding requires a buffer to store the decoded value. By default, the
+buffer is 1024 bytes on the stack. You can override the size this way:
+```cpp
+// ...
+const auto query = req.query<std::string, 128>("q");
+// ...
 ```
 
 #### Polling loop

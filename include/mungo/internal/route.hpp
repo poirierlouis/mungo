@@ -15,8 +15,13 @@ class response;
 
 namespace mungo::internal {
 template <typename T>
-concept route_parsable =
+concept route_param_parsable =
     std::is_integral_v<T> || std::is_same_v<T, std::string_view>;
+
+template <typename T>
+concept route_query_param_parsable =
+    std::is_same_v<T, bool> || std::is_integral_v<T> ||
+    std::is_same_v<T, std::string>;
 
 template <typename F>
 concept route_handler = std::is_invocable_v<F, const request&, response&>;
