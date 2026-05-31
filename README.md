@@ -10,10 +10,11 @@ for web development.
 
 ## Features
 
-- **Express-like Routing**: intuitive API for defining routes (`get`, `post`, 
+- **Express-like Routing**: intuitive API for defining routes (`get`, `post`,
   `put`, `patch`, `del`).
-- **Dynamic Route Parameters**: support for named parameters in routes (e.g., 
+- **Dynamic Route Parameters**: support for named parameters in routes (e.g.,
   `/api/users/:id`).
+- **Query Parameters**: support for decoding and parsing query parameters.
 - **Middleware Support**: flexible mechanism to handle requests before and after
   route handlers.
 - **Compile-time Routers**: group endpoints together with automatic middleware
@@ -38,6 +39,7 @@ The following example shows how to set up a basic server with
 ### Quick start
 
 You can setup an HTTP only server and provide a callback to handle log messages:
+
 ```cpp
 #include <iostream>
 
@@ -66,6 +68,7 @@ int main() {
 
 You can configure the server to use a thread pool for asynchronous request
 handling:
+
 ```cpp
   // ...
 
@@ -80,6 +83,7 @@ handling:
 #### Route handlers
 
 You can define routes and handle requests:
+
 ```cpp
   server.get<"/">(// lambda is executed as a task of the thread pool.
                   [](const mungo::request& req, mungo::response& res) {
@@ -95,6 +99,7 @@ You can define routes and handle requests:
 #### Named parameters
 
 You can declare named parameters to quickly access values from the URI:
+
 ```cpp
   // ...
 
@@ -118,9 +123,47 @@ You can declare named parameters to quickly access values from the URI:
   // ...
 ```
 
+#### Query parameters
+
+You can access query parameters from the URI. It can parse the value to:
+
+- a number (integer-like)
+- a boolean (strictly equal to either `true`, `t`, `yes`, `y`, `1`, `on`,
+  `enabled`)
+- a string (URL decoding is performed)
+
+```cpp
+  // ...
+
+  server.get<"/api/users">([](const mungo::request& req, mungo::response& res) {
+    const auto page = req.query<int>("page");
+    if (!page) {
+      res.bad_request("Invalid page number");
+      return;
+    }
+    if (*page < 1) {
+      res.bad_request("Page number must be greater than 0");
+      return;
+    }
+
+    // ...
+  });
+
+  // ...
+```
+
+URL decoding requires a buffer to store the decoded value. By default, the
+buffer is 1024 bytes on the stack. You can override the size this way:
+```cpp
+// ...
+const auto query = req.query<std::string, 128>("q");
+// ...
+```
+
 #### Polling loop
 
 You must run the server in a loop as it is event-driven:
+
 ```cpp
   // ...
 
@@ -135,9 +178,11 @@ You must run the server in a loop as it is event-driven:
 ### HTTPS
 
 You can configure the server to use TLS by providing:
+
 - paths of public certificate and private key files
 - unsafe host of the server to listen on (HTTP)
 - safe host of the server to listen on (HTTPS)
+
 ```cpp
   // ...
 
@@ -154,14 +199,16 @@ You can configure the server to use TLS by providing:
   // ...
 ```
 
-It will automatically redirect HTTP requests to HTTPS using a 
+It will automatically redirect HTTP requests to HTTPS using a
 `301 Moved Permanently` status code.
 
 ### mTLS
 
 You can configure the server to use two-way TLS by providing:
+
 - path of a certificate authority file
 - same as HTTPS above
+
 ```cpp
   // ...
 
@@ -180,6 +227,7 @@ You can configure the server to use two-way TLS by providing:
 ```
 
 You can access the client's certificate info from the request:
+
 ```cpp
   // ...
 
@@ -199,10 +247,12 @@ You can access the client's certificate info from the request:
 ```
 
 ### Middlewares / Interceptors / Filters
+
 You can create middlewares to handle a request before and after a route handler.
 
 In your middleware, you can call `next` with `req` and `res` objects to run the
 next handler in the chain.
+
 ```cpp
 // Add type ids to declare and use your middlewares (compile-time).
 struct mw_logger {};
@@ -242,7 +292,7 @@ int main() {
 
 ### Routers
 
-You can create routers to group endpoints together. It will automatically 
+You can create routers to group endpoints together. It will automatically
 include middlewares of the parent router. URI is resolved at compile-time.
 
 ```cpp
@@ -288,6 +338,7 @@ lookup. Because the framework packs these variants inside a fixed-size
 `std::array` directly within the request object, memory footprint is fully
 calculated at compile-time. This guarantees zero dynamic heap allocations and
 maximum CPU cache locality during the request lifecycle.
+
 ```cpp
 // Include customization point header.
 #include <mungo/attributes.hpp>

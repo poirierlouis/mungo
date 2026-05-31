@@ -2,7 +2,7 @@
 #define MUNGO_MUNGO_HPP
 
 // clang-format off
-#include <mgxx/http/internal/common.hpp>
+#include <mgxx/http/common.hpp>
 
 #include "mungo/app.hpp"
 #include "mungo/request.hpp"
