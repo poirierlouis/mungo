@@ -130,19 +130,21 @@ You can access query parameters from the URI. It can parse the value to:
 - a number (integer-like)
 - a boolean (strictly equal to either `true`, `t`, `yes`, `y`, `1`, `on`,
   `enabled`)
-- a string (URL decoding is performed)
+- a string (URL is decoded)
 
 ```cpp
   // ...
 
   server.get<"/api/users">([](const mungo::request& req, mungo::response& res) {
-    const auto page = req.query<int>("page");
-    if (!page) {
-      res.bad_request("Invalid page number");
+    const auto query = req.query<std::string>("q").value_or("");
+    if (query.length() < 3) {
+      res.bad_request("Invalid query string");
       return;
     }
-    if (*page < 1) {
-      res.bad_request("Page number must be greater than 0");
+
+    const auto page = req.query<int>("page").value_or(0);
+    if (page < 1) {
+      res.bad_request("Invalid page number");
       return;
     }
 
@@ -150,14 +152,6 @@ You can access query parameters from the URI. It can parse the value to:
   });
 
   // ...
-```
-
-URL decoding requires a buffer to store the decoded value. By default, the
-buffer is 1024 bytes on the stack. You can override the size this way:
-```cpp
-// ...
-const auto query = req.query<std::string, 128>("q");
-// ...
 ```
 
 #### Polling loop
