@@ -139,7 +139,7 @@ int main(int, char**) {
           })
       .get<"/api/users", mw_metric_time,
            mw_auth_basic>([](const mungo::request& req, mungo::response& res) {
-        const auto query = req.query<std::string, 128>("q").value_or("");
+        const auto query = req.query<std::string>("q").value_or("");
         const auto limit = req.query<uint32_t>("limit").value_or(50);
         res.header("Content-Type", "application/json")
             .ok(std::format(

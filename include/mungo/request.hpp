@@ -79,7 +79,7 @@ class basic_request {
     }
   }
 
-  template <internal::route_query_param_parsable T, size_t N = 1024>
+  template <internal::route_query_param_parsable T>
   [[nodiscard]] std::optional<T> query(const std::string_view name) const {
     const auto param = m_request.get_query_param(name);
     if (!param) {
@@ -87,7 +87,7 @@ class basic_request {
     }
 
     if constexpr (std::same_as<T, std::string>) {
-      return mgxx::http::decode_url<N>(param.value());
+      return mgxx::http::decode_url(param.value()).value_or(std::string(param.value()));
     } else if constexpr (std::same_as<T, bool>) {
       return param.value() == "true" || param.value() == "1" ||
              param.value() == "on" || param.value() == "yes" ||
